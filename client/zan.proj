@@ -1,0 +1,4 @@
+name = wuwei
+type = console
+entry = src/WuweiApp.BagSlot.zan
+target = exe
