@@ -1,38 +1,27 @@
 using System;
 using System.Csv;
 using System.IO;
+using Game.Data;
 
 namespace Wuwei;
 
 public class Tables {
-    public List<Row> Realms; public List<Row> Maps; public List<Row> Enemies;
-    public List<Row> Recipes; public List<Row> Ingredients; public List<Row> Skills;
-    public List<Row> Items; public List<Row> Quests; public List<Row> Sects;
-    public List<Row> SectTasks; public List<Row> Market; public List<Row> Talents; public List<Row> Balance;
-    public List<Row> Achievements; public List<Row> SectVault; public List<Row> Arena; public List<Row> Effects; public List<Row> Qualities; public List<Row> MasteryStars; public List<Row> QuestRewards;
-    public static List<Row> Read(string path) {
+    public List<DataRow> Realms; public List<DataRow> Maps; public List<DataRow> Enemies;
+    public List<DataRow> Recipes; public List<DataRow> Ingredients; public List<DataRow> Skills;
+    public List<DataRow> Items; public List<DataRow> Quests; public List<DataRow> Sects;
+    public List<DataRow> SectTasks; public List<DataRow> Market; public List<DataRow> Talents; public List<DataRow> Balance;
+    public List<DataRow> Achievements; public List<DataRow> SectVault; public List<DataRow> Arena; public List<DataRow> Effects; public List<DataRow> Qualities; public List<DataRow> MasteryStars; public List<DataRow> QuestRewards;
+    public static List<DataRow> Read(string path) {
         string text=File.ReadAllText(path);
         if (File.EmbedExists("wuwei-data/realms.csv")) {
             SaveStore codec=new SaveStore("");
             text=codec.Decode(text);
         }
-        CsvTable parsed = Csv.Parse(text);
-        if (parsed.RowCount() < 1) { throw new Exception("Empty data table: " + path); }
-        List<Row> result = new List<Row>(); List<string> header = parsed.Header();
-        Dictionary<string,bool> ids = new Dictionary<string,bool>();
-        List<List<string>> dataRows = parsed.Rows();
-        for (int i = 0; i < dataRows.Count; i = i + 1) {
-            List<string> values = dataRows[i];
-            if (values.Count != header.Count) { throw new Exception("CSV column mismatch: " + path); }
-            Row r = new Row();
-            for (int j = 0; j < header.Count; j = j + 1) {
-                if (r.Fields.ContainsKey(header[j])) { throw new Exception("Duplicate CSV header: " + path); }
-                r.Fields.Add(header[j],values[j]);
-            }
-            r.Id = r.Text("id"); r.Name = r.Text("name");
-            if (r.Id == "" || ids.ContainsKey(r.Id)) { throw new Exception("Duplicate/empty data ID: " + path); }
-            ids.Add(r.Id,true); result.Add(r);
-        }
+        // 解析与校验交给包里的 DataTable：列数不一致、表头重复列、
+        // id 为空或重复，都在那里顶掉（错误信息带行号定位）。
+        DataTable table = DataTable.Parse(text, path);
+        List<DataRow> result = new List<DataRow>();
+        for (int i = 0; i < table.Count(); i = i + 1) { result.Add(table.RowAt(i)); }
         return result;
     }
     public static Tables Load(string directory) {
@@ -45,13 +34,13 @@ public class Tables {
         t.SectTasks=Read(d+"/sect_tasks.csv"); t.Market=Read(d+"/market.csv"); t.Talents=Read(d+"/talents.csv"); t.Balance=Read(d+"/balance.csv");
         t.Achievements=Read(d+"/achievements.csv");t.SectVault=Read(d+"/sect_vault.csv");t.Arena=Read(d+"/arena.csv");t.Effects=Read(d+"/effects.csv");t.Qualities=Read(d+"/qualities.csv");t.MasteryStars=Read(d+"/mastery_stars.csv");t.QuestRewards=Read(d+"/quest_rewards.csv");
         if (t.Realms.Count != 9 || t.Skills.Count != 10 || t.Talents.Count != 4) { throw new Exception("Unsupported Wuwei table schema"); }
-        foreach (Row m in t.Maps) {
+        foreach (DataRow m in t.Maps) {
             if (m.Int("req") < 1 || m.Int("req") > 108 || m.Int("enemy_count") < 1 || m.Int("first_enemy") < 0 || m.Int("first_enemy")+m.Int("enemy_count") > t.Enemies.Count) { throw new Exception("Invalid map: " + m.Name); }
         }
-        foreach (Row e in t.Enemies) { if (e.Num("hp") <= 0 || e.Num("interval") < 0.1 || e.Num("scale") <= 0) { throw new Exception("Invalid enemy: " + e.Name); } }
-        foreach (Row r in t.Recipes) { if (r.Num("duration") < 0.1 || r.Int("unlock") < 1) { throw new Exception("Invalid recipe: " + r.Name); } }
+        foreach (DataRow e in t.Enemies) { if (e.Num("hp") <= 0 || e.Num("interval") < 0.1 || e.Num("scale") <= 0) { throw new Exception("Invalid enemy: " + e.Name); } }
+        foreach (DataRow r in t.Recipes) { if (r.Num("duration") < 0.1 || r.Int("unlock") < 1) { throw new Exception("Invalid recipe: " + r.Name); } }
         return t;
     }
-    public Row Find(List<Row> rows,string id) { foreach (Row r in rows) { if (r.Id == id) { return r; } } return null; }
-    public double Rule(string id) { Row r=Find(Balance,id); if (r == null) { throw new Exception("Missing balance: "+id); } return r.Num("value"); }
+    public DataRow Find(List<DataRow> rows,string id) { foreach (DataRow r in rows) { if (r.Id == id) { return r; } } return null; }
+    public double Rule(string id) { DataRow r=Find(Balance,id); if (r == null) { throw new Exception("Missing balance: "+id); } return r.Num("value"); }
 }

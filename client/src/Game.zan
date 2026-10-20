@@ -1,5 +1,6 @@
 using System;
 using System.Csv;
+using Game.Data;
 namespace Wuwei;
 
 public class Game {
@@ -230,7 +231,7 @@ public class Game {
     public double Attack() { return (12+(Level-1)*3.2+Realm()*8+Skill("attack")*2.5+PermanentAttack+Gear("atk"))*(SectIndex == 1 ? 1+SectManual*0.015 : 1)*WineMultiplier("atk")*(1+FormationEffect("atk")); }
     public double Defense() { return (2+(Level-1)*1.15+Realm()*4+PermanentDefense+Gear("def"))*(1+FormationEffect("defense"))*WineMultiplier("defense")*(1+Constitution*0.04)*(SectIndex == 0 ? 1+SectManual*0.01 : 1); }
     public double Power() { return Attack()*4+Defense()*3+MaxHp()*0.2; }
-    public double QiNeed() { Row r=Data.Realms[Realm()]; if (Layer() == 12 && Realm() < 8) { return r.Num("breakthrough"); } return r.Num("base")+r.Num("step")*(Layer()-1); }
+    public double QiNeed() { DataRow r=Data.Realms[Realm()]; if (Layer() == 12 && Realm() < 8) { return r.Num("breakthrough"); } return r.Num("base")+r.Num("step")*(Layer()-1); }
     public double CultivationRate() { return Max(1,(int)((10+Realm()*4)*(1+Skill("mind")*0.1)*(1+SpiritRoot*0.05)*(SectIndex == 0 ? 1+SectManual*0.01 : 1)*(QuestIndex >= Data.Quests.Count ? 1.05 : 1)*(1+FormationEffect("qi"))*WineMultiplier("qi"))); }
     public int Random(int max) { Seed=(Seed*25173+13849)%65536; return Seed%max; }
     public void ResetRun() {
@@ -248,7 +249,7 @@ public class Game {
     public int ItemCount(string id) { return Count(Inventory,id); }
     public bool AddItem(string id,int amount) {
         if (amount <= 0 || id == "" || ItemRow(id)==null) { return false; }
-        Row item=ItemRow(id);
+        DataRow item=ItemRow(id);
         if (item.Text("slot")!="" && !GearBases.ContainsKey(id)) {
             if (Inventory.Count+amount>(int)Data.Rule("bag_capacity")) {return false;}
             for (int i=0;i<amount;i=i+1) {Bump(RunState,"gear_serial",1);string uid=id+"#"+Convert.ToString(Count(RunState,"gear_serial"));int roll=Random(10000)-Fortune*15;int quality=(int)Max(item.Int("quality"),roll<100 ? 4 : roll<500 ? 3 : roll<1500 ? 2 : roll<4500 ? 1 : 0);GearBases[uid]=id;GearQualities[uid]=quality;Inventory[uid]=1;if (quality==4) {StatMax("SPECIAL_RARITY",1);}}return true;
@@ -262,15 +263,15 @@ public class Game {
     public bool MapUnlocked(int index) { return index>=0 && index<Data.Maps.Count && Level>=Data.Maps[index].Int("req"); }
     public bool StartBattle(int index) { if (NeedsPrestige || !MapUnlocked(index) || Recovery>0) { return Say("境界不足或正在疗伤",false); } StopActivity();Activity=2;MapIndex=index;Wave=1;Spawn();return Say("前往"+Data.Maps[index].Name,true); }
     public void Spawn() {
-        Row map=Data.Maps[MapIndex]; EnemyIndex=map.Int("first_enemy")+(map.Text("mode") == "extreme" ? 0 : Random(map.Int("enemy_count")));
-        Row enemy=Data.Enemies[EnemyIndex]; double scale=enemy.Num("scale");
+        DataRow map=Data.Maps[MapIndex]; EnemyIndex=map.Int("first_enemy")+(map.Text("mode") == "extreme" ? 0 : Random(map.Int("enemy_count")));
+        DataRow enemy=Data.Enemies[EnemyIndex]; double scale=enemy.Num("scale");
         if (map.Text("mode") == "extreme" && Wave<9) { scale=scale*(0.35+Wave*0.045); }
         EnemyMaxHp=enemy.Num("hp")*scale;EnemyHp=EnemyMaxHp;PlayerClock=0;EnemyClock=0;BattleTalismans();
     }
-    public double EnemyScale() { Row m=Data.Maps[MapIndex]; return Data.Enemies[EnemyIndex].Num("scale")*(m.Text("mode") == "extreme" && Wave<9 ? 0.35+Wave*0.045 : 1); }
+    public double EnemyScale() { DataRow m=Data.Maps[MapIndex]; return Data.Enemies[EnemyIndex].Num("scale")*(m.Text("mode") == "extreme" && Wave<9 ? 0.35+Wave*0.045 : 1); }
     public void GainKarma(int n) { Karma=Karma+n;LifetimeKarma=LifetimeKarma+n; }
     public void Victory() {
-        Row e=Data.Enemies[EnemyIndex];Row m=Data.Maps[MapIndex];Kills=Kills+1;TotalKills=TotalKills+1;
+        DataRow e=Data.Enemies[EnemyIndex];DataRow m=Data.Maps[MapIndex];Kills=Kills+1;TotalKills=TotalKills+1;
         if (Count(MapKills,m.Id)==0) {Stones=Stones+e.Num("stone")*3;Say("首次踏破 · "+m.Name,true);}
         if (m.Text("mode")!="extreme" || Wave==9) {Bump(EnemyKills,e.Id,1);}Bump(MapKills,m.Id,1);if (Count(RunState,"swift")>0) {Bump(RunState,"swift",-1);}
         Xp=Xp+e.Num("xp")*(1+Insight*0.05+Skill("spirit_refining")*0.01);
@@ -297,29 +298,29 @@ public class Game {
     }
     public double SkillCost(int index) { if (index<0 || index>=Data.Skills.Count) { return 0; } return Data.Rule("skill_cost")+Skill(Data.Skills[index].Id)*Data.Rule("skill_step"); }
     public bool UpgradeSkill(int index) {
-        if (NeedsPrestige || index<0 || index>=Data.Skills.Count) { return false; } Row s=Data.Skills[index];double cost=SkillCost(index);
+        if (NeedsPrestige || index<0 || index>=Data.Skills.Count) { return false; } DataRow s=Data.Skills[index];double cost=SkillCost(index);
         if (Level<s.Int("req") || Skill(s.Id)>=s.Int("max_level") || Xp<cost) { return Say("参悟所需修为或境界不足",false); }
         Xp=Xp-cost;Bump(SkillLevels,s.Id,1);return Say(s.Name+"参悟更进一步",true);
     }
     public bool CanCraft(int index) {
-        if (index<0 || index>=Data.Recipes.Count) { return false; } Row r=Data.Recipes[index];
+        if (index<0 || index>=Data.Recipes.Count) { return false; } DataRow r=Data.Recipes[index];
         if (r.Text("kind")=="boss_drop" || ArtLevel(r.Text("skill"))<r.Int("unlock")) { return false; }
-        foreach (Row cost in Data.Ingredients) { if (cost.Text("recipe") == r.Id) { if (cost.Text("item") == "stones") { if (Stones<cost.Int("count")) { return false; } } else if (ItemCount(cost.Text("item"))<cost.Int("count")) { return false; } } } return true;
+        foreach (DataRow cost in Data.Ingredients) { if (cost.Text("recipe") == r.Id) { if (cost.Text("item") == "stones") { if (Stones<cost.Int("count")) { return false; } } else if (ItemCount(cost.Text("item"))<cost.Int("count")) { return false; } } } return true;
     }
     public bool StartCraft(int index) { if (NeedsPrestige || !CanCraft(index)) { return Say("杂学等级或材料不足",false); } StopActivity();RecipeIndex=index;Activity=3;return Say("开始"+Data.Recipes[index].Name,true); }
-    public double CraftDuration() { Row r=Data.Recipes[RecipeIndex];return Max(1,r.Num("duration")*(1-(MasteryStar(r.Id)-1)*0.05)/((1+(ArtLevel(r.Text("skill"))-1)*0.003)*WineMultiplier("craft")*(r.Text("kind")=="gather" ? WineMultiplier("gather") : 1)*(1+FormationEffect("craft")))); }
+    public double CraftDuration() { DataRow r=Data.Recipes[RecipeIndex];return Max(1,r.Num("duration")*(1-(MasteryStar(r.Id)-1)*0.05)/((1+(ArtLevel(r.Text("skill"))-1)*0.003)*WineMultiplier("craft")*(r.Text("kind")=="gather" ? WineMultiplier("gather") : 1)*(1+FormationEffect("craft")))); }
     public void CompleteCraft() {
         if (!CanCraft(RecipeIndex)) { StopActivity();Say("材料不足，已停止制作",false);return; }
-        Row r=Data.Recipes[RecipeIndex];
+        DataRow r=Data.Recipes[RecipeIndex];
         if (Inventory.Count>=(int)Data.Rule("bag_capacity") && ItemCount(r.Text("result"))==0) {StopActivity();Say("行囊已满",false);return;}
-        foreach (Row cost in Data.Ingredients) { if (cost.Text("recipe") == r.Id) { if (cost.Text("item") == "stones") { Stones=Stones-cost.Int("count"); } else { TakeItem(cost.Text("item"),cost.Int("count")); } } }
+        foreach (DataRow cost in Data.Ingredients) { if (cost.Text("recipe") == r.Id) { if (cost.Text("item") == "stones") { Stones=Stones-cost.Int("count"); } else { TakeItem(cost.Text("item"),cost.Int("count")); } } }
         AddItem(r.Text("result"),1);Bump(Crafted,r.Id,1);Bump(Mastery,r.Id,1);CraftCount=CraftCount+1;if (r.Text("kind")=="formation") {if (Formation=="") {Formation=r.Id;}if (Formation==r.Id) {FormationStars=MasteryStar(r.Id);}}
         if (r.Text("kind") == "gather") { GatherCount=GatherCount+1; if (r.Text("rare")!="" && Random(100)<12+Fortune) { AddItem(r.Text("rare"),1); } }
         string art=r.Text("skill");Bump(ArtXp,art,(int)((6+r.Int("unlock")/4)*WineMultiplier("artxp")*(1+FormationEffect("artxp"))*(1+Insight*0.05+Skill("arts_insight")*0.006)));
         while (Count(ArtXp,art)>=(25+ArtLevel(art)*18) && ArtLevel(art)<99) { ArtXp[art]=Count(ArtXp,art)-(25+ArtLevel(art)*18);ArtLevels[art]=ArtLevel(art)+1; }
     }
     public bool UseItem(string id) {
-        Row r=ItemRow(id);if (NeedsPrestige || r == null || ItemCount(id)<1 || Level<(int)Max(1,r.Int("req"))) { return false; }
+        DataRow r=ItemRow(id);if (NeedsPrestige || r == null || ItemCount(id)<1 || Level<(int)Max(1,r.Int("req"))) { return false; }
         string type=r.Text("type");
         if (type == "equipment" || r.Text("slot")!="") { string slot=r.Text("slot");if (slot == "") { slot="weapon"; }string old=Equipment.ContainsKey(slot) ? Equipment[slot] : "";TakeItem(id,1);if (old!="") { AddItem(old,1); }Equipment[slot]=id;Hp=Min(Hp,MaxHp());return Say("装备 "+r.Name,true); }
         if (id=="treasure_box") {if (!GiveGear(Data.Enemies[Random(Data.Enemies.Count)].Text("drop"),3)) {return false;}TakeItem(id,1);return true;}
@@ -348,16 +349,16 @@ public class Game {
         }
         return Say("此物用于制作或破境",false);
     }
-    public bool Buy(int index) { if (NeedsPrestige || index<0 || index>=Data.Market.Count) { return false; }Row r=Data.Market[index];if (Stones<r.Num("price") || Level<r.Int("req") || ItemCount(r.Id)>=Data.Rule("stack_limit")) { return Say("灵石不足或商品尚未解锁",false); }if (!AddItem(r.Id,1)) { return false; }Stones=Stones-r.Num("price");Purchases=Purchases+1;Collect("market",r.Id);return Say("购得 "+r.Name,true); }
-    public bool Sell(string id,int quantity) { Row r=ItemRow(id);if (r == null || !TakeItem(id,quantity)) { return false; }Stones=Stones+Max(1,r.Num("price")*0.35)*quantity;return Say("售出 "+r.Name,true); }
+    public bool Buy(int index) { if (NeedsPrestige || index<0 || index>=Data.Market.Count) { return false; }DataRow r=Data.Market[index];if (Stones<r.Num("price") || Level<r.Int("req") || ItemCount(r.Id)>=Data.Rule("stack_limit")) { return Say("灵石不足或商品尚未解锁",false); }if (!AddItem(r.Id,1)) { return false; }Stones=Stones-r.Num("price");Purchases=Purchases+1;Collect("market",r.Id);return Say("购得 "+r.Name,true); }
+    public bool Sell(string id,int quantity) { DataRow r=ItemRow(id);if (r == null || !TakeItem(id,quantity)) { return false; }Stones=Stones+Max(1,r.Num("price")*0.35)*quantity;return Say("售出 "+r.Name,true); }
     public bool JoinSect(int index) { if (NeedsPrestige || SectIndex>=0 || index<0 || index>=Data.Sects.Count || Level<Data.Sects[index].Int("req")) { return Say("筑基后方可择宗，一世只择一宗",false); }SectIndex=index;return Say("拜入 "+Data.Sects[index].Name,true); }
     public bool TrainSect() { if (SectIndex<0 || Contribution<520*(SectManual+1) || SectManual>=99) { return false; }Contribution=Contribution-520*(SectManual+1);SectManual=SectManual+1;return Say("宗门心法精进",true); }
-    public double SectTaskProgress(int index) { if (index<0 || index>=Data.SectTasks.Count) { return 0; }Row t=Data.SectTasks[index];double n=t.Text("kind") == "kills" ? Kills : t.Text("kind") == "craft" ? CraftCount : CultivationSeconds;return Max(0,n-Count(SectClaims,t.Id)*t.Num("target")); }
-    public bool ClaimSectTask(int index) { if (SectIndex<0 || index<0 || index>=Data.SectTasks.Count) { return false; }Row t=Data.SectTasks[index];if (t.Text("sect")!=Data.Sects[SectIndex].Id || SectTaskProgress(index)<t.Num("target")) { return false; }Bump(SectClaims,t.Id,1);Contribution=Contribution+t.Num("reward");return Say("宗门任务完成",true); }
+    public double SectTaskProgress(int index) { if (index<0 || index>=Data.SectTasks.Count) { return 0; }DataRow t=Data.SectTasks[index];double n=t.Text("kind") == "kills" ? Kills : t.Text("kind") == "craft" ? CraftCount : CultivationSeconds;return Max(0,n-Count(SectClaims,t.Id)*t.Num("target")); }
+    public bool ClaimSectTask(int index) { if (SectIndex<0 || index<0 || index>=Data.SectTasks.Count) { return false; }DataRow t=Data.SectTasks[index];if (t.Text("sect")!=Data.Sects[SectIndex].Id || SectTaskProgress(index)<t.Num("target")) { return false; }Bump(SectClaims,t.Id,1);Contribution=Contribution+t.Num("reward");return Say("宗门任务完成",true); }
     public double QuestProgress() {
         if (QuestIndex>=Data.Quests.Count) { return 0; }
-        if (QuestIndex==15) {int processed=0;int star=1;foreach (Row r in Data.Recipes) {if (r.Text("kind")!="gather") {processed=processed+Count(Crafted,r.Id);}star=(int)Max(star,MasteryStar(r.Id));}return Max(ArtLevel("fishing"),Max(ArtLevel("herbalism"),ArtLevel("mining")))>=5 && processed>=3 && star>=2 ? Data.Quests[QuestIndex].Num("target") : 0;}
-        if (QuestIndex==16) {int talismans=0;int formations=0;foreach (Row r in Data.Recipes) {if (r.Text("skill")=="talismans") {talismans=talismans+Count(Crafted,r.Id);}if (r.Text("skill")=="formations") {formations=formations+Count(Crafted,r.Id);}}return talismans>0 && formations>0 && Formation!="" ? 1 : 0;}
+        if (QuestIndex==15) {int processed=0;int star=1;foreach (DataRow r in Data.Recipes) {if (r.Text("kind")!="gather") {processed=processed+Count(Crafted,r.Id);}star=(int)Max(star,MasteryStar(r.Id));}return Max(ArtLevel("fishing"),Max(ArtLevel("herbalism"),ArtLevel("mining")))>=5 && processed>=3 && star>=2 ? Data.Quests[QuestIndex].Num("target") : 0;}
+        if (QuestIndex==16) {int talismans=0;int formations=0;foreach (DataRow r in Data.Recipes) {if (r.Text("skill")=="talismans") {talismans=talismans+Count(Crafted,r.Id);}if (r.Text("skill")=="formations") {formations=formations+Count(Crafted,r.Id);}}return talismans>0 && formations>0 && Formation!="" ? 1 : 0;}
         if (QuestIndex==17) {return Level>=12 ? Count(MapKills,"10") : 0;}
         if (QuestIndex==19) {return Level>=12 ? BossKills : 0;}
         if (QuestIndex==20) {return Data.Quests[QuestIndex].Num("target");}
@@ -374,8 +375,8 @@ public class Game {
     }
     public bool ClaimQuest() {
         if (NeedsPrestige || QuestIndex>=Data.Quests.Count || QuestProgress()<Data.Quests[QuestIndex].Num("target")) {return Say("任务尚未完成",false);}
-        Row q=Data.Quests[QuestIndex];Stones=Stones+q.Num("stones");Xp=Xp+q.Num("xp");
-        foreach (Row reward in Data.QuestRewards) {if (reward.Int("quest")==QuestIndex) {string item=reward.Text("item");int amount=reward.Int("count");
+        DataRow q=Data.Quests[QuestIndex];Stones=Stones+q.Num("stones");Xp=Xp+q.Num("xp");
+        foreach (DataRow reward in Data.QuestRewards) {if (reward.Int("quest")==QuestIndex) {string item=reward.Text("item");int amount=reward.Int("count");
             if (item=="contribution") {Contribution=Contribution+amount;}
             else if (item=="skills") {foreach (string key in SkillLevels.Keys) {SkillLevels[key]=(int)Min(99,SkillLevels[key]+amount);}}
             else if (item=="equipment") {for (int i=0;i<amount;i=i+1) {GiveGear(Data.Enemies[QuestIndex==2 ? 0 : 3].Text("drop"),QuestIndex==2 ? 0 : 3);}}
@@ -429,7 +430,7 @@ public class Game {
                 if (Random(100)<35) { TriggerAdventure(); }
             }
         }
-        Row e=Data.Enemies[EnemyIndex];PlayerClock=PlayerClock+dt;EnemyClock=EnemyClock+dt;
+        DataRow e=Data.Enemies[EnemyIndex];PlayerClock=PlayerClock+dt;EnemyClock=EnemyClock+dt;
         double interval=(Count(RunState,"swift")>0 ? 0.78 : 1)*Max(0.36,1.2-Level*0.0078)*Max(0.55,1-Skill("flowing_cloud")*0.004);
         if (PlayerClock>=interval) {
             PlayerClock=PlayerClock-interval;
@@ -654,12 +655,12 @@ public class Game {
                 else {return false;}
             }
             if (scalarCount!=51) {return false;}
-            foreach (string id in candidate.GearBases.Keys) {Row r=Data.Find(Data.Items,candidate.GearBases[id]);if (r==null || r.Text("slot")=="" || !candidate.GearQualities.ContainsKey(id) || candidate.GearQualities[id]>4 || id.IndexOf(candidate.GearBases[id]+"#")!=0) {return false;}}
+            foreach (string id in candidate.GearBases.Keys) {DataRow r=Data.Find(Data.Items,candidate.GearBases[id]);if (r==null || r.Text("slot")=="" || !candidate.GearQualities.ContainsKey(id) || candidate.GearQualities[id]>4 || id.IndexOf(candidate.GearBases[id]+"#")!=0) {return false;}}
             foreach (string id in candidate.GearQualities.Keys) {if (!candidate.GearBases.ContainsKey(id)) {return false;}}
             foreach (string id in candidate.Achievements.Keys) {if (Data.Find(Data.Achievements,id)==null || candidate.Achievements[id]!=1) {return false;}}
             foreach (string id in candidate.ArenaState.Keys) {if (Data.Find(Data.Arena,id)==null) {return false;}}
-            foreach (string id in candidate.WineTimers.Keys) {Row r=Data.Find(Data.Items,id);if (r==null || r.Text("type")!="wine" || candidate.WineTimers[id]>720) {return false;}}
-            foreach (string key in candidate.Loadout.Keys) {Row r=Data.Find(Data.Items,candidate.Loadout[key]);if (key!="talisman" || r==null || r.Text("type")!="talisman") {return false;}}
+            foreach (string id in candidate.WineTimers.Keys) {DataRow r=Data.Find(Data.Items,id);if (r==null || r.Text("type")!="wine" || candidate.WineTimers[id]>720) {return false;}}
+            foreach (string key in candidate.Loadout.Keys) {DataRow r=Data.Find(Data.Items,candidate.Loadout[key]);if (key!="talisman" || r==null || r.Text("type")!="talisman") {return false;}}
             if (rows[0][2]=="1" && candidate.Wine!="" && candidate.WineSeconds>0) {candidate.WineTimers[candidate.Wine]=(int)Min(720,candidate.WineSeconds*4);}
             if (candidate.Qi>candidate.QiNeed() || candidate.Hp>candidate.MaxHp()+Max(0.001,candidate.MaxHp()*0.00001) || candidate.Karma>candidate.LifetimeKarma || candidate.TotalKills<candidate.Kills) {return false;}
             if (candidate.Activity==2 && (!candidate.MapUnlocked(candidate.MapIndex) || candidate.EnemyHp<=0 || candidate.EnemyHp>candidate.EnemyMaxHp || Data.Enemies[candidate.EnemyIndex].Int("map")!=candidate.MapIndex)) {return false;}
@@ -668,13 +669,13 @@ public class Game {
             foreach (string id in candidate.SkillLevels.Keys) {if (Data.Find(Data.Skills,id)==null) {return false;}}
             foreach (string id in candidate.EnemyKills.Keys) {if (Data.Find(Data.Enemies,id)==null) {return false;}}
             foreach (string id in candidate.MapKills.Keys) {if (Data.Find(Data.Maps,id)==null) {return false;}}
-            foreach (string id in candidate.BossClears.Keys) {Row map=Data.Find(Data.Maps,id);if (map==null || map.Text("mode")!="extreme") {return false;}}
+            foreach (string id in candidate.BossClears.Keys) {DataRow map=Data.Find(Data.Maps,id);if (map==null || map.Text("mode")!="extreme") {return false;}}
             foreach (string id in candidate.Mastery.Keys) {if (Data.Find(Data.Recipes,id)==null) {return false;}}
             foreach (string id in candidate.Crafted.Keys) {if (Data.Find(Data.Recipes,id)==null) {return false;}}
             foreach (string id in candidate.SectClaims.Keys) {if (id!="arena_wins" && id.IndexOf("arena:")!=0 && Data.Find(Data.SectTasks,id)==null) {return false;}}
-            foreach (string id in candidate.ArtLevels.Keys) {bool found=false;foreach (Row recipe in Data.Recipes) {if (recipe.Text("skill")==id) {found=true;}}if (!found) {return false;}}
-            foreach (string id in candidate.ArtXp.Keys) {bool found=false;foreach (Row recipe in Data.Recipes) {if (recipe.Text("skill")==id) {found=true;}}if (!found) {return false;}}
-            foreach (string slot in candidate.Equipment.Keys) {Row r=candidate.ItemRow(candidate.Equipment[slot]);if (r==null || r.Text("slot")!=slot) {return false;}}
+            foreach (string id in candidate.ArtLevels.Keys) {bool found=false;foreach (DataRow recipe in Data.Recipes) {if (recipe.Text("skill")==id) {found=true;}}if (!found) {return false;}}
+            foreach (string id in candidate.ArtXp.Keys) {bool found=false;foreach (DataRow recipe in Data.Recipes) {if (recipe.Text("skill")==id) {found=true;}}if (!found) {return false;}}
+            foreach (string slot in candidate.Equipment.Keys) {DataRow r=candidate.ItemRow(candidate.Equipment[slot]);if (r==null || r.Text("slot")!=slot) {return false;}}
             if (candidate.Formation!="" && Data.Find(Data.Items,candidate.Formation)==null) {return false;}
             if (candidate.Wine!="" && Data.Find(Data.Items,candidate.Wine)==null) {return false;}
             SavedUnixSeconds=candidate.SavedUnixSeconds;
@@ -752,8 +753,8 @@ public class Game {
         } catch (Exception ex) {return false;}
     }
 
-    public Row AchievementRow(int index) {return index>=0 && index<Data.Achievements.Count ? Data.Achievements[index] : null;}
-    public Row ArenaOpponentRow(int index) {return ArenaOpponent(index);}
+    public DataRow AchievementRow(int index) {return index>=0 && index<Data.Achievements.Count ? Data.Achievements[index] : null;}
+    public DataRow ArenaOpponentRow(int index) {return ArenaOpponent(index);}
     public int AchievementCount() { return Data.Achievements.Count; }
     public string AchievementName(int index) { return index>=0 && index<AchievementCount() ? Data.Achievements[index].Name : ""; }
     public int AchievementProgress(int index) { UpdateAchievements();if (index<0 || index>=AchievementCount()) {return 0;}return Count(AchievementStats,Data.Achievements[index].Text("metric")); }
@@ -765,41 +766,41 @@ public class Game {
         StatMax("STAT_CULTIVATION_STAGE",Level);StatMax("STAT_TOTAL_KILLS",TotalKills);StatMax("STAT_REINCARNATION_COUNT",Rebirths);
         StatMax("SPECIAL_RETREAT",CultivationSeconds>0 ? 1 : 0);StatMax("SPECIAL_EQUIPMENT",Equipment.Count);StatMax("SPECIAL_QUEST",QuestIndex>=Data.Quests.Count ? 1 : 0);
         StatMax("SPECIAL_APTITUDES",(SpiritRoot>0 ? 1 : 0)+(Constitution>0 ? 1 : 0)+(Insight>0 ? 1 : 0)+(Fortune>0 ? 1 : 0));
-        foreach (Row e in Data.Enemies) {if (Count(EnemyKills,e.Id)>0) {Row m=Data.Maps[e.Int("map")];Collect(m.Text("mode"),e.Id);if (m.Text("mode")=="extreme") {if (m.Int("ordinal")<8) {Collect("major",e.Id);}else {StatMax("SPECIAL_EMISSARY",1);}}}}
-        foreach (Row r in Data.Recipes) {if (Count(Crafted,r.Id)>0) {Collect(r.Text("skill"),r.Id);}}
+        foreach (DataRow e in Data.Enemies) {if (Count(EnemyKills,e.Id)>0) {DataRow m=Data.Maps[e.Int("map")];Collect(m.Text("mode"),e.Id);if (m.Text("mode")=="extreme") {if (m.Int("ordinal")<8) {Collect("major",e.Id);}else {StatMax("SPECIAL_EMISSARY",1);}}}}
+        foreach (DataRow r in Data.Recipes) {if (Count(Crafted,r.Id)>0) {Collect(r.Text("skill"),r.Id);}}
         StatMax("STAT_UNIQUE_WILD_ENEMIES",Collected("wild"));StatMax("STAT_UNIQUE_DANGER_ENEMIES",Collected("danger"));StatMax("STAT_UNIQUE_BOSSES",Collected("extreme"));StatMax("STAT_MAJOR_BOSSES_DEFEATED",Collected("major"));
         StatMax("STAT_UNIQUE_FISHING",Collected("fishing"));StatMax("STAT_UNIQUE_HERBALISM",Collected("herbalism"));StatMax("STAT_UNIQUE_MINING",Collected("mining"));StatMax("STAT_UNIQUE_BREWING",Collected("brewing"));StatMax("STAT_UNIQUE_FORGING",Collected("forging"));StatMax("STAT_UNIQUE_ALCHEMY",Collected("alchemy"));StatMax("STAT_UNIQUE_TALISMAN",Collected("talismans"));StatMax("STAT_UNIQUE_FORMATION",Collected("formations"));StatMax("STAT_UNIQUE_MARKET_PURCHASES",Collected("market"));
-        foreach (Row a in Data.Achievements) {if (Count(AchievementStats,a.Text("metric"))>=a.Int("target")) {Achievements[a.Id]=1;}}
+        foreach (DataRow a in Data.Achievements) {if (Count(AchievementStats,a.Text("metric"))>=a.Int("target")) {Achievements[a.Id]=1;}}
     }
-    public Row SectVaultRow(int index) {if (SectIndex<0 || index<0) {return null;}int n=0;foreach (Row r in Data.SectVault) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {if (n==index) {return r;}n=n+1;}}return null;}
-    public int SectVaultCount() {int n=0;if (SectIndex>=0) {foreach (Row r in Data.SectVault) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {n=n+1;}}}return n;}
-    public string SectVaultItem(int index) {Row r=SectVaultRow(index);return r==null ? "" : r.Id;}
-    public double SectVaultCost(int index) {Row r=SectVaultRow(index);return r==null ? 0.0 : r.Num("cost")*(r.Text("type")=="manual" ? SectManual+1 : 1);}
-    public bool ExchangeSectVault(int index) {Row r=SectVaultRow(index);double cost=SectVaultCost(index);if (NeedsPrestige || r==null || Level<r.Int("req") || Contribution<cost) {return false;}if (r.Text("type")=="manual") {if (SectManual>=99) {return false;}SectManual=SectManual+1;}else if (!AddItem(r.Id,1)) {return false;}Contribution=Contribution-cost;return Say("兑换 "+r.Name,true);}
+    public DataRow SectVaultRow(int index) {if (SectIndex<0 || index<0) {return null;}int n=0;foreach (DataRow r in Data.SectVault) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {if (n==index) {return r;}n=n+1;}}return null;}
+    public int SectVaultCount() {int n=0;if (SectIndex>=0) {foreach (DataRow r in Data.SectVault) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {n=n+1;}}}return n;}
+    public string SectVaultItem(int index) {DataRow r=SectVaultRow(index);return r==null ? "" : r.Id;}
+    public double SectVaultCost(int index) {DataRow r=SectVaultRow(index);return r==null ? 0.0 : r.Num("cost")*(r.Text("type")=="manual" ? SectManual+1 : 1);}
+    public bool ExchangeSectVault(int index) {DataRow r=SectVaultRow(index);double cost=SectVaultCost(index);if (NeedsPrestige || r==null || Level<r.Int("req") || Contribution<cost) {return false;}if (r.Text("type")=="manual") {if (SectManual>=99) {return false;}SectManual=SectManual+1;}else if (!AddItem(r.Id,1)) {return false;}Contribution=Contribution-cost;return Say("兑换 "+r.Name,true);}
     public double ArenaPower() {return Attack()*2+Defense()*3+MaxHp()*0.15;}
     public double ArenaCycleSeconds() {return Data.Rule("arena_cycle");}
     public double ArenaWindowSeconds() {return Data.Rule("arena_window");}
     public int ArenaCycle() {return (int)(PlayedSeconds/ArenaCycleSeconds());}
     public bool ArenaAvailable() {return !NeedsPrestige && Recovery<=0 && SectIndex>=0 && Level>=13 && PlayedSeconds-ArenaCycle()*ArenaCycleSeconds()<ArenaWindowSeconds();}
-    public Row ArenaOpponent(int index) {if (SectIndex<0 || index<0) {return null;}int n=0;foreach (Row r in Data.Arena) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {if (n==index) {return r;}n=n+1;}}return null;}
-    public int ArenaOpponentCount() {int n=0;if (SectIndex>=0) {foreach (Row r in Data.Arena) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {n=n+1;}}}return n;}
-    public string ArenaOpponentId(int index) {Row r=ArenaOpponent(index);return r==null ? "" : r.Id;}
+    public DataRow ArenaOpponent(int index) {if (SectIndex<0 || index<0) {return null;}int n=0;foreach (DataRow r in Data.Arena) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {if (n==index) {return r;}n=n+1;}}return null;}
+    public int ArenaOpponentCount() {int n=0;if (SectIndex>=0) {foreach (DataRow r in Data.Arena) {if (r.Text("sect")==Data.Sects[SectIndex].Id) {n=n+1;}}}return n;}
+    public string ArenaOpponentId(int index) {DataRow r=ArenaOpponent(index);return r==null ? "" : r.Id;}
     public bool ArenaOpponentWon(int index) {return ArenaOpponentId(index)!="" && Count(ArenaState,ArenaOpponentId(index))==ArenaCycle()+1;}
     public int ArenaWins() {return Count(RunState,"arena_wins");}
     public bool ArenaFight() {for (int i=0;i<ArenaOpponentCount();i=i+1) {if (!ArenaOpponentAttempted(i)) {return ArenaFightOpponent(i);}}return false;}
     public bool ArenaOpponentAttempted(int index) {string id=ArenaOpponentId(index);return id!="" && Count(RunState,"arena:"+id)==ArenaCycle()+1;}
-    public bool ArenaFightOpponent(int index) {Row r=ArenaOpponent(index);if (!ArenaAvailable() || r==null || ArenaOpponentAttempted(index) || Level<r.Int("req")) {return false;}RunState["arena:"+r.Id]=ArenaCycle()+1;if (ArenaPower()*(0.92+Random(161)*0.001)<r.Num("power")*(0.92+Random(161)*0.001)) {return Say("切磋失利，下轮再战",false);}ArenaState[r.Id]=ArenaCycle()+1;Bump(RunState,"arena_wins",1);Contribution=Contribution+r.Num("reward");return Say("切磋获胜 · "+r.Name,true);}
+    public bool ArenaFightOpponent(int index) {DataRow r=ArenaOpponent(index);if (!ArenaAvailable() || r==null || ArenaOpponentAttempted(index) || Level<r.Int("req")) {return false;}RunState["arena:"+r.Id]=ArenaCycle()+1;if (ArenaPower()*(0.92+Random(161)*0.001)<r.Num("power")*(0.92+Random(161)*0.001)) {return Say("切磋失利，下轮再战",false);}ArenaState[r.Id]=ArenaCycle()+1;Bump(RunState,"arena_wins",1);Contribution=Contribution+r.Num("reward");return Say("切磋获胜 · "+r.Name,true);}
     public bool GiveGear(string baseId,int minimumQuality) {if (!AddItem(baseId,1)) {return false;}string id=baseId+"#"+Convert.ToString(Count(RunState,"gear_serial"));if (!GearBases.ContainsKey(id)) {return false;}GearQualities[id]=(int)Min(4,Max(minimumQuality,GearQuality(id)));if (GearQualities[id]==4) {StatMax("SPECIAL_RARITY",1);}return true;}
     public bool Unequip(string slot) {if (!Equipment.ContainsKey(slot) || Inventory.Count>=(int)Data.Rule("bag_capacity")) {return false;}string id=Equipment[slot];if (!AddItem(id,1)) {return false;}Equipment.Remove(slot);Hp=Min(Hp,MaxHp());return true;}
     public string ItemBaseId(string id) {return GearBases.ContainsKey(id) ? GearBases[id] : id;}
-    public Row ItemRow(string id) {return Data.Find(Data.Items,ItemBaseId(id));}
-    public int GearQuality(string id) {Row r=ItemRow(id);return GearQualities.ContainsKey(id) ? GearQualities[id] : r==null ? 0 : r.Int("quality");}
-    public double GearStat(string id,string stat) {Row r=ItemRow(id);return r==null ? 0.0 : r.Num(stat)*(GearBases.ContainsKey(id) ? Data.Qualities[GearQuality(id)].Num("scale") : 1);}
-    public string ItemName(string id) {Row r=ItemRow(id);return r==null ? id : (GearBases.ContainsKey(id) ? Data.Qualities[GearQuality(id)].Name+" · " : "")+r.Name;}
-    public bool CompareGear(string id,string slot) {Row r=ItemRow(id);if (r==null || r.Text("slot")!=slot) {return false;}string old=Equipment.ContainsKey(slot) ? Equipment[slot] : "";return GearStat(id,"atk")*4+GearStat(id,"def")*3+GearStat(id,"hp")*0.2>GearStat(old,"atk")*4+GearStat(old,"def")*3+GearStat(old,"hp")*0.2;}
-    public bool RecycleGear(string id) {Row r=ItemRow(id);if (r==null || r.Text("slot")=="" || !TakeItem(id,1)) {return false;}Stones=Stones+Max(5,(5+Level*1.5+GearStat(id,"atk")*2+GearStat(id,"def")*2+GearStat(id,"hp")*0.15)*(1+GearQuality(id)*0.35));return true;}
-    public int MasteryStar(string id) {int star=1;foreach (Row r in Data.MasteryStars) {if (Count(Mastery,id)>=r.Int("threshold")) {star=r.Int("id");}}return star;}
-    public double Effect(string id,string stat) {Row r=Data.Find(Data.Effects,id);return r==null ? 0.0 : r.Num(stat);}
+    public DataRow ItemRow(string id) {return Data.Find(Data.Items,ItemBaseId(id));}
+    public int GearQuality(string id) {DataRow r=ItemRow(id);return GearQualities.ContainsKey(id) ? GearQualities[id] : r==null ? 0 : r.Int("quality");}
+    public double GearStat(string id,string stat) {DataRow r=ItemRow(id);return r==null ? 0.0 : r.Num(stat)*(GearBases.ContainsKey(id) ? Data.Qualities[GearQuality(id)].Num("scale") : 1);}
+    public string ItemName(string id) {DataRow r=ItemRow(id);return r==null ? id : (GearBases.ContainsKey(id) ? Data.Qualities[GearQuality(id)].Name+" · " : "")+r.Name;}
+    public bool CompareGear(string id,string slot) {DataRow r=ItemRow(id);if (r==null || r.Text("slot")!=slot) {return false;}string old=Equipment.ContainsKey(slot) ? Equipment[slot] : "";return GearStat(id,"atk")*4+GearStat(id,"def")*3+GearStat(id,"hp")*0.2>GearStat(old,"atk")*4+GearStat(old,"def")*3+GearStat(old,"hp")*0.2;}
+    public bool RecycleGear(string id) {DataRow r=ItemRow(id);if (r==null || r.Text("slot")=="" || !TakeItem(id,1)) {return false;}Stones=Stones+Max(5,(5+Level*1.5+GearStat(id,"atk")*2+GearStat(id,"def")*2+GearStat(id,"hp")*0.15)*(1+GearQuality(id)*0.35));return true;}
+    public int MasteryStar(string id) {int star=1;foreach (DataRow r in Data.MasteryStars) {if (Count(Mastery,id)>=r.Int("threshold")) {star=r.Int("id");}}return star;}
+    public double Effect(string id,string stat) {DataRow r=Data.Find(Data.Effects,id);return r==null ? 0.0 : r.Num(stat);}
     public double FormationEffect(string stat) {return Effect(Formation,stat)*FormationStars;}
     public double WineMultiplier(string stat) {double n=1;foreach (string id in WineTimers.Keys) {if (WineTimers[id]>0) {n=n*(1+Effect(id,stat));}}return n;}
     public void SetMusicAdjusted() {RunState["music_adjusted"]=1;}

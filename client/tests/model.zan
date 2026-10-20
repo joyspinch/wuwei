@@ -1,5 +1,6 @@
 using System;
 using Wuwei;
+using Game.Data;
 class Program {
     static void Check(bool condition,string message) { if (!condition) {Console.WriteLine(message);throw new Exception(message);} }
     static void Main() {
@@ -35,17 +36,17 @@ class Program {
         g.Prestige();g.Level=13;g.SkillLevels.Clear();Check(g.MaxHp()==359 && g.Attack()>58.39 && g.Attack()<58.41 && g.Defense()>19.79,"total level stat formulas");
         for (int sect=0;sect<2;sect=sect+1) {
             g.Prestige();g.Level=108;g.Hp=g.MaxHp();g.Contribution=100000;Check(g.JoinSect(sect),"join actual sect");Check(g.ArenaOpponentCount()==5 && g.SectVaultCount()==3,"all actual sect content");
-            for (int v=0;v<3;v=v+1) {Row row=g.SectVaultRow(v);Check(row!=null && g.ItemRow(row.Id)!=null,"real vault IDs");double contribution=g.Contribution;Check(g.ExchangeSectVault(v),"vault exchange");Check(g.Contribution<contribution,"vault charges contribution");}
+            for (int v=0;v<3;v=v+1) {DataRow row=g.SectVaultRow(v);Check(row!=null && g.ItemRow(row.Id)!=null,"real vault IDs");double contribution=g.Contribution;Check(g.ExchangeSectVault(v),"vault exchange");Check(g.Contribution<contribution,"vault charges contribution");}
             Check(g.SectManual==1 && g.SectVaultCost(1)==1040,"escalating manual price");
             string pill=g.SectVaultItem(2);double xp=g.Xp;Check(g.UseItem(pill) && g.Xp==xp+3000,"sect potion effect");
-            g.PermanentAttack=120;g.SkillLevels["attack"]=99;g.SpiritRoot=100;g.Constitution=100;g.Hp=g.MaxHp();g.PlayedSeconds=0;foreach (Row item in g.Data.Items) {if (item.Text("slot")!="") {g.AddItem(item.Id,1);}}foreach (string id in g.Inventory.Keys) {Row item=g.ItemRow(id);if (item!=null && item.Text("slot")!="" && g.CompareGear(id,item.Text("slot"))) {g.UseItem(id);}}g.Hp=g.MaxHp();
-            for (int opponent=0;opponent<5;opponent=opponent+1) {Row row=g.ArenaOpponentRow(opponent);Check(row!=null && row.Int("req")== (opponent==0 ? 13 : opponent==1 ? 25 : opponent==2 ? 49 : opponent==3 ? 73 : 97),"authentic arena gates");double contribution=g.Contribution;Check(g.ArenaFightOpponent(opponent),"arena win");Check(g.Contribution==contribution+row.Num("reward") && g.ArenaOpponentWon(opponent),"arena real reward and cycle win");Check(!g.ArenaFightOpponent(opponent),"no duplicate cycle win");}
+            g.PermanentAttack=120;g.SkillLevels["attack"]=99;g.SpiritRoot=100;g.Constitution=100;g.Hp=g.MaxHp();g.PlayedSeconds=0;foreach (DataRow item in g.Data.Items) {if (item.Text("slot")!="") {g.AddItem(item.Id,1);}}foreach (string id in g.Inventory.Keys) {DataRow item=g.ItemRow(id);if (item!=null && item.Text("slot")!="" && g.CompareGear(id,item.Text("slot"))) {g.UseItem(id);}}g.Hp=g.MaxHp();
+            for (int opponent=0;opponent<5;opponent=opponent+1) {DataRow row=g.ArenaOpponentRow(opponent);Check(row!=null && row.Int("req")== (opponent==0 ? 13 : opponent==1 ? 25 : opponent==2 ? 49 : opponent==3 ? 73 : 97),"authentic arena gates");double contribution=g.Contribution;Check(g.ArenaFightOpponent(opponent),"arena win");Check(g.Contribution==contribution+row.Num("reward") && g.ArenaOpponentWon(opponent),"arena real reward and cycle win");Check(!g.ArenaFightOpponent(opponent),"no duplicate cycle win");}
             Check(g.ArenaWins()==5,"five wins");g.PlayedSeconds=300;Check(!g.ArenaAvailable(),"arena closed window");g.PlayedSeconds=900;Check(g.ArenaAvailable() && !g.ArenaOpponentWon(0) && g.ArenaFightOpponent(0),"new cycle resets opponent");
             string arenaSave=g.Serialize();Check(restored.LoadState(arenaSave) && restored.ArenaWins()==6 && restored.ArenaOpponentWon(0),"arena save roundtrip");
         }
         g.Prestige();g.Level=108;g.Hp=g.MaxHp();
-        foreach (Row item in g.Data.Items) {if (item.Text("type")=="alchemy") {g.AddItem(item.Id,1);g.Hp=1;g.AgeSeconds=500;double xp=g.Xp;Check(g.UseItem(item.Id),"all alchemy effects consume: "+item.Id);if (item.Text("effect")=="xp_500") {Check(g.Xp==xp+500,"original xp500");}if (item.Text("effect")=="xp_10000") {Check(g.Xp==xp+10000,"original xp10000");}if (item.Text("effect")=="qi") {Check(g.Xp==xp+40,"original spirit pill40");}}}
-        foreach (Row effect in g.Data.Effects) {
+        foreach (DataRow item in g.Data.Items) {if (item.Text("type")=="alchemy") {g.AddItem(item.Id,1);g.Hp=1;g.AgeSeconds=500;double xp=g.Xp;Check(g.UseItem(item.Id),"all alchemy effects consume: "+item.Id);if (item.Text("effect")=="xp_500") {Check(g.Xp==xp+500,"original xp500");}if (item.Text("effect")=="xp_10000") {Check(g.Xp==xp+10000,"original xp10000");}if (item.Text("effect")=="qi") {Check(g.Xp==xp+40,"original spirit pill40");}}}
+        foreach (DataRow effect in g.Data.Effects) {
             g.WineTimers.Clear();g.Formation="";g.FormationStars=1;
             if (effect.Id.IndexOf("brewing_")==0) {g.AddItem(effect.Id,1);Check(g.UseItem(effect.Id) && g.WineTimers[effect.Id]==720,"all wine activation");foreach (string stat in effect.Fields.Keys) {if (stat!="id" && effect.Text(stat)!="") {Check(g.WineMultiplier(stat)>1+effect.Num(stat)-0.000001 && g.WineMultiplier(stat)<1+effect.Num(stat)+0.000001,"every wine numerical effect "+effect.Id+" "+stat);}}g.Tick(180);Check(g.WineTimers[effect.Id]==0,"wine expiration");}
             if (effect.Id.IndexOf("formation_")==0) {g.AddItem(effect.Id,1);g.Mastery[effect.Id]=1000;Check(g.UseItem(effect.Id),"all formations activate");foreach (string stat in effect.Fields.Keys) {if (stat!="id" && effect.Text(stat)!="") {Check(g.FormationEffect(stat)==effect.Num(stat)*g.MasteryStar(effect.Id),"every formation numerical effect");}}}
@@ -67,9 +68,9 @@ class Program {
         g.Prestige();g.Level=13;g.QuestIndex=12;Check(g.ClaimQuest(),"retroactive foundation quest avoids soft lock");g.QuestIndex=20;Check(g.ClaimQuest(),"final quest unconditional after earlier gates");
         g.QuestIndex=8;g.ManualSaves=1;Check(!g.ClaimQuest(),"music and save both required");g.SetMusicAdjusted();Check(g.ClaimQuest(),"music preference gate");
         g.Level=108;g.TotalKills=1000;g.CultivationSeconds=30;g.Rebirths=1;g.SpiritRoot=1;g.Constitution=1;g.Insight=1;g.Fortune=1;g.QuestIndex=g.Data.Quests.Count;
-        foreach (Row enemy in g.Data.Enemies) {g.EnemyKills[enemy.Id]=1;}foreach (Row recipe in g.Data.Recipes) {g.Crafted[recipe.Id]=1;}foreach (Row market in g.Data.Market) {g.Collect("market",market.Id);}
-        foreach (Row item in g.Data.Items) {if (item.Text("slot")!="" && !g.Equipment.ContainsKey(item.Text("slot"))) {g.GiveGear(item.Id,4);string id=item.Id+"#"+Convert.ToString(g.Count(g.RunState,"gear_serial"));Check(g.UseItem(id),"equip achievement slot");}}g.Hp=g.MaxHp();
-        for (int a=0;a<g.AchievementCount();a=a+1) {Row row=g.AchievementRow(a);Check(g.AchievementUnlocked(a) && g.AchievementName(a)==row.Name && g.AchievementProgress(a)>=row.Int("target"),"all 33 real achievement predicates "+row.Id);}
+        foreach (DataRow enemy in g.Data.Enemies) {g.EnemyKills[enemy.Id]=1;}foreach (DataRow recipe in g.Data.Recipes) {g.Crafted[recipe.Id]=1;}foreach (DataRow market in g.Data.Market) {g.Collect("market",market.Id);}
+        foreach (DataRow item in g.Data.Items) {if (item.Text("slot")!="" && !g.Equipment.ContainsKey(item.Text("slot"))) {g.GiveGear(item.Id,4);string id=item.Id+"#"+Convert.ToString(g.Count(g.RunState,"gear_serial"));Check(g.UseItem(id),"equip achievement slot");}}g.Hp=g.MaxHp();
+        for (int a=0;a<g.AchievementCount();a=a+1) {DataRow row=g.AchievementRow(a);Check(g.AchievementUnlocked(a) && g.AchievementName(a)==row.Name && g.AchievementProgress(a)>=row.Int("target"),"all 33 real achievement predicates "+row.Id);}
         string achievementSave=g.Serialize();Check(restored.LoadState(achievementSave),"achievement save");g.Prestige();for (int a=0;a<33;a=a+1) {Check(g.AchievementUnlocked(a),"achievement persists across prestige");}
         g.Prestige();g.Constitution=0;g.SpiritRoot=0;g.Hp=g.MaxHp();g.Achievements.Clear();g.AchievementStats.Clear();g.Collections.Clear();string modern=g.Serialize();
         CsvTable modernTable=System.Csv.Csv.Parse(modern);List<List<string>> legacyRows=new List<List<string>>();legacyRows.Add(modernTable.header);foreach (List<string> r in modernTable.rows) {legacyRows.Add(r);}List<List<string>> legacy=new List<List<string>>();List<string> header=legacyRows[0];header[2]="1";
