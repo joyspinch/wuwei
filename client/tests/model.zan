@@ -72,9 +72,9 @@ class Program {
         for (int a=0;a<g.AchievementCount();a=a+1) {Row row=g.AchievementRow(a);Check(g.AchievementUnlocked(a) && g.AchievementName(a)==row.Name && g.AchievementProgress(a)>=row.Int("target"),"all 33 real achievement predicates "+row.Id);}
         string achievementSave=g.Serialize();Check(restored.LoadState(achievementSave),"achievement save");g.Prestige();for (int a=0;a<33;a=a+1) {Check(g.AchievementUnlocked(a),"achievement persists across prestige");}
         g.Prestige();g.Constitution=0;g.SpiritRoot=0;g.Hp=g.MaxHp();g.Achievements.Clear();g.AchievementStats.Clear();g.Collections.Clear();string modern=g.Serialize();
-        List<List<string>> legacyRows=System.Text.Csv.Parse(modern);List<List<string>> legacy=new List<List<string>>();List<string> header=legacyRows[0];header[2]="1";
+        CsvTable modernTable=System.Csv.Csv.Parse(modern);List<List<string>> legacyRows=new List<List<string>>();legacyRows.Add(modernTable.header);foreach (List<string> r in modernTable.rows) {legacyRows.Add(r);}List<List<string>> legacy=new List<List<string>>();List<string> header=legacyRows[0];header[2]="1";
         foreach (List<string> row in legacyRows) {string group=row[0];if (group!="Achievements" && group!="AchievementStats" && group!="Collections" && group!="ArenaState" && group!="RunState" && group!="GearQualities" && group!="WineTimers" && group!="GearBases" && group!="Loadout") {legacy.Add(row);}}
-        Check(restored.LoadState(System.Text.Csv.Serialize(legacy)),"schema1 migration preserves old scalars and dictionaries");
+        Check(restored.LoadState(System.Csv.Csv.Serialize(legacy)),"schema1 migration preserves old scalars and dictionaries");
         g.Level=108;g.Hp=g.MaxHp();g.SpiritRoot=100;g.Constitution=100;g.PermanentAttack=120;g.SkillLevels["attack"]=99;g.Hp=g.MaxHp();Check(g.StartBattle(28),"final ascending gate");g.Wave=9;g.EnemyHp=1;g.Victory();Check(g.Ascended && g.BossKills==1,"final ascension after ninth boss wave");
         Console.WriteLine("Wuwei core model tests passed: source tables, 33 achievements, 10 opponents, effects, identities, quests, migration, ascension");
     }
