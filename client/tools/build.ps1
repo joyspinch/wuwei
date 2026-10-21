@@ -2,7 +2,10 @@ param(
     [string]$Compiler = $env:ZANC,
     [string]$Stdlib = $env:ZAN_STDLIB,
     [string]$Output = '',
-    [switch]$Development
+    [switch]$Development,
+    # 透传给 zanc 的额外参数（单文件发布：--link-mode static 等）。
+    # 之前没有这个口：发布相关参数只能改脚本硬编码，命令行调不出来。
+    [string[]]$ZancArgs = @()
 )
 $ErrorActionPreference = 'Stop'
 $project = Split-Path -Parent $PSScriptRoot
@@ -29,8 +32,8 @@ $sources = @(Get-ChildItem (Join-Path $project 'src') -Recurse -File -Filter *.z
 # 里手写 Main —— App.html 绝不能当第一输入。
 $design = Join-Path $project 'src/App.html'
 if (Test-Path $design) { $sources += $design }
-$args = @($sources) + @('--auto-stdlib', '--subsystem', 'windows')
-if ($Stdlib) { $args += @('--stdlib-path', $Stdlib) }
+$zargs = @($sources) + @('--auto-stdlib', '--subsystem', 'windows')
+if ($Stdlib) { $zargs += @('--stdlib-path', $Stdlib) }
 if ($Development) {
     Write-Host "DBG-DEV-MODE project=$project"
     Copy-Item (Join-Path $project 'data') (Join-Path $Output 'data') -Recurse -Force
@@ -38,14 +41,16 @@ if ($Development) {
     $packed = Join-Path (Split-Path -Parent $Output) 'protected-tables'
     & python (Join-Path $PSScriptRoot 'pack_data.py') --source (Join-Path $project 'data') --output $packed
     if ($LASTEXITCODE -ne 0) { throw 'Table packing failed. Install Python cryptography first.' }
-    $args += @('--publish', '--embed', "$packed=wuwei-data", '--embed', "$(Join-Path $project 'assets')=assets", '--embed', "$(Join-Path $project 'skins')=skins")
+    $zargs += @('--publish', '--embed', "$packed=wuwei-data", '--embed', "$(Join-Path $project 'assets')=assets", '--embed', "$(Join-Path $project 'skins')=skins")
     foreach ($folder in @('data', 'assets', 'skins')) {
         if (Test-Path (Join-Path $Output $folder)) { throw "Release output contains a loose $folder directory; choose a fresh output directory to verify embedded resources." }
     }
 }
+# 透传口：命令行加参数不用改脚本（单文件发布：-ZancArgs @('--link-mode','static')）。
+if ($ZancArgs) { $zargs += $ZancArgs }
 $exe = Join-Path $Output 'WuweiCultivation.exe'
-$args += @('-o', $exe)
-& $Compiler @args
+$zargs += @('-o', $exe)
+& $Compiler @zargs
 if ($LASTEXITCODE -ne 0) { throw "zanc failed ($LASTEXITCODE)" }
 if ($Development) {
     foreach ($folder in @('assets', 'skins')) {
